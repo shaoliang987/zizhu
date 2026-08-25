@@ -137,6 +137,10 @@ async function runScanBody() {
 
   if (isLive()) {
     await checkAllPairExposures(state);
+    if (state.liveCircuitBreaker?.active || state.bot_status === 'paused') {
+      saveState(state);
+      return;
+    }
     await retryPendingRedeems(state);
   }
 
@@ -193,6 +197,7 @@ async function runScanBody() {
         'info'
       );
       await executePlan(state, market, plan);
+      if (state.liveCircuitBreaker?.active || state.bot_status === 'paused') break;
     } else {
       recordPlanOutcome(plan);
     }
@@ -210,7 +215,8 @@ async function runScanBody() {
 
 async function runScan() {
   if (scanInFlight) return;
-  if (isBotPaused() || state.bot_status === 'paused') return;
+  const riskRecoveryActive = isLive() && state.liveCircuitBreaker?.active;
+  if (isBotPaused() || (state.bot_status === 'paused' && !riskRecoveryActive)) return;
   scanInFlight = true;
   try {
     await withStateLock(async () => {
@@ -449,6 +455,13 @@ async function handleApi(req, res, pathname) {
       try {
         const { paused } = JSON.parse(body || '{}');
         const nextPaused = Boolean(paused);
+        state = loadState();
+        if (!nextPaused && state.liveCircuitBreaker?.active) {
+          return sendJson(res, 409, {
+            error: '实盘断路器仍处于活动状态；裸仓和未完成订单清除后才能恢复交易。',
+            circuit_breaker: state.liveCircuitBreaker,
+          });
+        }
         // Apply immediately so UI/next scan see it without waiting on scan lock
         setPaused(nextPaused);
         state.bot_status = nextPaused ? 'paused' : 'running';
