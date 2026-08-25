@@ -32,4 +32,16 @@ console.log('reconcile-marks.test.js\n');
   console.log('  ok: outcomeFromMarks');
 }
 
-console.log('\n3 passed');
+{
+  const { latestSettlementByCondition } = require('../lib/reconcile');
+  const map = latestSettlementByCondition([
+    { conditionId: 'a', ts: '2026-01-01T00:00:00Z', upMark: 1, downMark: 0, realized: 0.2 },
+    { conditionId: 'a', ts: '2026-01-01T01:00:00Z', realized: 0.2 }, // newer, no marks
+  ]);
+  const row = map.get('a');
+  assert.strictEqual(row.upMark, 1, 'keep marks when newer row omits them');
+  assert.strictEqual(row.downMark, 0);
+  console.log('  ok: latestSettlement merges marks');
+}
+
+console.log('\n4 passed');
