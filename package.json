@@ -1,0 +1,35 @@
+{
+  "name": "polymarket-btc5m-strategy",
+  "version": "2.0.0",
+  "description": "Autonomous BTC 5m Up/Down pair strategy bot (paper + live)",
+  "main": "bot.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "mkdir -p logs && nohup node bot.js >> logs/bot.log 2>&1 & echo $! > logs/bot.pid",
+    "start:paper": "mkdir -p logs && nohup env STATE_DIR=./data/paper DRY_RUN=true LOCK_MODE=true INSTANCE_NAME=paper PORT=8087 STRATEGY_PARAMS_FILE=./strategy_params.json node bot.js >> logs/bot.log 2>&1 & echo $! > logs/bot.pid",
+    "start:live": "mkdir -p logs && nohup env STATE_DIR=./data/live DRY_RUN=false LOCK_MODE=true INSTANCE_NAME=live PORT=8086 START_PAUSED=true STRATEGY_PARAMS_FILE=./strategy_params.json node bot.js >> logs/bot-live.log 2>&1 & echo $! > logs/bot-live.pid",
+    "stop:paper": "if [ -f logs/bot.pid ]; then kill \"$(cat logs/bot.pid)\" 2>/dev/null || true; rm -f logs/bot.pid; fi",
+    "stop:live": "if [ -f logs/bot-live.pid ]; then kill \"$(cat logs/bot-live.pid)\" 2>/dev/null || true; rm -f logs/bot-live.pid; fi",
+    "scan": "STATE_DIR=./data/paper DRY_RUN=true node -e \"require('./bot.js')\"",
+    "test": "node test/risk-guards.test.js && node test/skip-stats.test.js && node test/live-fill-sync.test.js && node test/hedge-cap.test.js && node test/dedupe-fills.test.js && node test/reconcile-marks.test.js && node test/activity-merge.test.js",
+    "stats:paper": "node scripts/paper-pair-stats.js ./data/paper",
+    "stats:live": "node scripts/paper-pair-stats.js ./data/live",
+    "backfill:activity": "STATE_DIR=./data/live DRY_RUN=false node scripts/backfill-activity.js",
+    "backfill:activity:dry": "STATE_DIR=./data/live DRY_RUN=false node scripts/backfill-activity.js --dry-run",
+    "stats:report": "node scripts/pair-stats-report.js",
+    "stats:loop:start": "bash scripts/stats-loop.sh start",
+    "stats:loop:stop": "bash scripts/stats-loop.sh stop",
+    "stats:loop:status": "bash scripts/stats-loop.sh status",
+    "stats:loop:once": "bash scripts/stats-loop.sh once"
+  },
+  "dependencies": {
+    "@polymarket/builder-relayer-client": "^0.0.10",
+    "@polymarket/builder-signing-sdk": "^1.0.0",
+    "@polymarket/clob-client-v2": "^1.1.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^5.7.2",
+    "node-fetch": "^2.7.0",
+    "viem": "^2.55.19",
+    "ws": "^8.21.3"
+  }
+}

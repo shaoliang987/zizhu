@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BTC 5m 自主策略</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <p class="eyebrow">BTC 5m 双边策略</p>
+        <h1>BTC 5m Pair Arb</h1>
+        <p class="sub">maker 双边 · bidSum≤0.99 · 持有至结算</p>
+      </div>
+      <div class="top-actions">
+        <span id="modeBadge" class="badge">PAPER</span>
+        <span id="statusBadge" class="badge muted">…</span>
+        <button id="pauseBtn" class="btn">暂停</button>
+        <button id="scanBtn" class="btn ghost">立即扫描</button>
+      </div>
+    </header>
+
+    <section class="panel risk-panel" id="riskPanel">
+      <div class="row-between risk-panel-header">
+        <div>
+          <h2>风控状态</h2>
+          <p class="risk-sub" id="riskSummaryText">加载中…</p>
+        </div>
+        <span id="riskBadge" class="badge muted">…</span>
+      </div>
+      <div class="risk-metrics" id="riskMetrics"></div>
+      <div class="table-wrap" id="riskTableWrap" hidden>
+        <table class="risk-table">
+          <thead>
+            <tr>
+              <th>市场</th>
+              <th>类型</th>
+              <th>详情</th>
+            </tr>
+          </thead>
+          <tbody id="riskBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="pnl-section">
+      <div class="pnl-section-header">
+        <h2>盈亏统计</h2>
+        <div class="pnl-header-actions">
+          <span class="pnl-hint" id="pnlHint">纸上：策略账本核算 · 未实现按市价估值</span>
+          <button type="button" class="btn ghost btn-sm" id="syncAccountBtn">同步账户</button>
+        </div>
+      </div>
+      <div class="metrics-grid pnl-grid">
+        <div class="metric-card invest" id="initialCapitalCard">
+          <div class="metric-header">
+            <span>初始资金</span>
+            <span class="card-icon">🏦</span>
+          </div>
+          <div class="metric-value" id="statInitialCapital">$0.00</div>
+          <div class="metric-sub" id="statInitialCapitalSub">当前权益 —</div>
+        </div>
+
+        <div class="metric-card invest" id="cashCard">
+          <div class="metric-header">
+            <span>账户现金</span>
+            <span class="card-icon">💵</span>
+          </div>
+          <div class="metric-value" id="statCashUsdc">—</div>
+          <div class="metric-sub" id="statCashSub">初始+已实现−持仓成本</div>
+        </div>
+
+        <div class="metric-card invest">
+          <div class="metric-header">
+            <span>累计买入投入</span>
+            <span class="card-icon">📦</span>
+          </div>
+          <div class="metric-value" id="statInvestedUsdc">$0.00</div>
+          <div class="metric-sub" id="statInvestedSub">结算回收 —</div>
+          <div class="metric-sub" id="statFeesSub">累计手续费 —</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span>持仓成本</span>
+            <span class="card-icon">🧮</span>
+          </div>
+          <div class="metric-value" id="statOpenCost">$0.00</div>
+          <div class="metric-sub" id="statOpenCostSub">开放持仓 0 个</div>
+        </div>
+
+        <div class="metric-card pnl" id="realizedCard">
+          <div class="metric-header">
+            <span>已实现盈亏</span>
+            <span class="card-icon">✅</span>
+          </div>
+          <div class="metric-value" id="statRealizedPnl">$0.00</div>
+          <div class="metric-sub" id="statRealizedSub">结算锁定收益</div>
+        </div>
+
+        <div class="metric-card pnl" id="unrealizedCard">
+          <div class="metric-header">
+            <span>未实现盈亏</span>
+            <span class="card-icon">📈</span>
+          </div>
+          <div class="metric-value" id="statUnrealizedPnl">$0.00</div>
+          <div class="metric-sub" id="statUnrealizedSub">市值 − 持仓成本</div>
+        </div>
+
+        <div class="metric-card pnl" id="pnlCard">
+          <div class="metric-header">
+            <span>总盈亏</span>
+            <span class="card-icon">📊</span>
+          </div>
+          <div class="metric-value" id="statPnl">$0.00</div>
+          <div class="metric-sub" id="statPnlSub">已实现 + 未实现</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="signalPanel">
+      <h2>当前市场</h2>
+      <div id="signalBody" class="signal">等待扫描…</div>
+    </section>
+
+    <section class="panel sheets-panel">
+      <div class="sheet-header">
+        <div class="sheet-tabs" role="tablist" aria-label="持仓工作表">
+          <button type="button" class="sheet-tab active" data-sheet="positions" role="tab">持仓</button>
+          <button type="button" class="sheet-tab" data-sheet="orders" role="tab">挂单 <span class="muted" id="ordersCount"></span></button>
+          <button type="button" class="sheet-tab" data-sheet="reconcile" role="tab">对账明细</button>
+          <button type="button" class="sheet-tab" data-sheet="daily" role="tab">每日盈亏</button>
+        </div>
+      </div>
+
+      <div class="sheet-body">
+        <div class="sheet-page active" id="sheet-positions" data-sheet="positions">
+          <div class="row-between pos-header sheet-toolbar">
+            <div class="pos-header-actions">
+              <span class="positions-refresh-hint" id="positionsRefreshHint">市价取自 CLOB midpoint；刷新会更新标记价与浮盈</span>
+              <button type="button" class="btn ghost btn-sm" id="refreshMarksBtn">刷新市价</button>
+            </div>
+            <button type="button" class="btn ghost btn-sm" id="settleCheckBtn">结算检查</button>
+          </div>
+          <div class="table-wrap">
+            <table class="positions-table">
+              <thead>
+                <tr>
+                  <th>市场</th>
+                  <th>Up</th>
+                  <th>Down</th>
+                  <th>投入</th>
+                  <th>浮盈</th>
+                </tr>
+              </thead>
+              <tbody id="posBody">
+                <tr><td colspan="5" class="empty">暂无持仓</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="sheet-page" id="sheet-orders" data-sheet="orders">
+          <div class="row-between pos-header sheet-toolbar">
+            <span class="positions-refresh-hint">纸上模拟 Polymarket GTC：占款挂单，按实盘盘口排队/穿价/吃单成交</span>
+          </div>
+          <div class="table-wrap">
+            <table class="orders-table">
+              <thead>
+                <tr>
+                  <th>市场</th>
+                  <th>方向</th>
+                  <th>限价</th>
+                  <th>剩余</th>
+                  <th>队列前</th>
+                  <th>占款</th>
+                </tr>
+              </thead>
+              <tbody id="ordersBody">
+                <tr><td colspan="6" class="empty">暂无挂单</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="sheet-page" id="sheet-reconcile" data-sheet="reconcile">
+          <div class="recon-summary" id="reconSummary">
+            <div class="recon-metric"><span class="recon-metric-label">成交笔数</span><strong id="reconFillCount">0</strong></div>
+            <div class="recon-metric"><span class="recon-metric-label">窗口</span><strong id="reconWindowCount">0</strong></div>
+            <div class="recon-metric"><span class="recon-metric-label">成交成本</span><strong id="reconCost">$0.00</strong></div>
+            <div class="recon-metric"><span class="recon-metric-label">已实现</span><strong id="reconRealized">$0.00</strong></div>
+            <div class="recon-metric"><span class="recon-metric-label">未实现</span><strong id="reconUnrealized">$0.00</strong></div>
+            <div class="recon-metric"><span class="recon-metric-label">合计</span><strong id="reconTotal">$0.00</strong></div>
+          </div>
+          <p class="recon-note" id="reconNote">仅含 PAPER_BUY / LIVE_BUY 成交，按 5m 窗口汇总，便于与账本核对</p>
+          <div class="recon-view-tabs" role="tablist" aria-label="对账视图">
+            <button type="button" class="recon-view-tab" data-recon-view="fills">逐笔成交</button>
+            <button type="button" class="recon-view-tab active" data-recon-view="windows">按窗口汇总</button>
+          </div>
+          <div class="recon-view" id="reconViewWindows" data-recon-view="windows">
+            <div class="table-wrap">
+              <table class="reconcile-table">
+                <thead>
+                  <tr>
+                    <th>窗口 (ET)</th>
+                    <th>结果</th>
+                    <th>笔数</th>
+                    <th>总份额</th>
+                    <th>均价</th>
+                    <th>总成本</th>
+                    <th>状态</th>
+                    <th>结算价</th>
+                    <th>结算结果</th>
+                    <th>已实现</th>
+                  </tr>
+                </thead>
+                <tbody id="reconWindowBody">
+                  <tr><td colspan="10" class="empty">暂无对账数据</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="recon-pager" id="reconWindowPager" hidden>
+              <button type="button" class="recon-pager-btn" data-recon-page="prev">上一页</button>
+              <span class="recon-pager-info" id="reconWindowPagerInfo">—</span>
+              <button type="button" class="recon-pager-btn" data-recon-page="next">下一页</button>
+            </div>
+          </div>
+          <div class="recon-view" id="reconViewFills" data-recon-view="fills" hidden>
+            <div class="table-wrap">
+              <table class="reconcile-fills-table">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>窗口 (ET)</th>
+                    <th>方向</th>
+                    <th>份额</th>
+                    <th>价格</th>
+                    <th>成本</th>
+                    <th>费</th>
+                    <th>角色</th>
+                  </tr>
+                </thead>
+                <tbody id="reconFillBody">
+                  <tr><td colspan="8" class="empty">暂无成交</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="recon-pager" id="reconFillPager" hidden>
+              <button type="button" class="recon-pager-btn" data-recon-page="prev">上一页</button>
+              <span class="recon-pager-info" id="reconFillPagerInfo">—</span>
+              <button type="button" class="recon-pager-btn" data-recon-page="next">下一页</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sheet-page" id="sheet-daily" data-sheet="daily">
+          <div class="row-between pos-header sheet-toolbar">
+            <span class="positions-refresh-hint">按市场日（标题 ET 日期）汇总已实现 + 未实现</span>
+            <div class="daily-pnl-totals" id="dailyPnlTotals">合计: —</div>
+          </div>
+          <div class="daily-chart-wrap">
+            <canvas id="dailyPnlChart" width="1100" height="280"></canvas>
+            <div class="empty" id="dailyPnlEmpty" style="display:none;">暂无每日盈亏数据</div>
+          </div>
+          <div class="table-wrap">
+            <table class="daily-pnl-table">
+              <thead>
+                <tr>
+                  <th>市场日 (ET)</th>
+                  <th>已实现</th>
+                  <th>未实现</th>
+                  <th>合计</th>
+                  <th>成交笔数</th>
+                  <th>持仓/已平</th>
+                </tr>
+              </thead>
+              <tbody id="dailyPnlBody">
+                <tr><td colspan="6" class="empty">暂无数据</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>策略参数</h2>
+      <form id="paramsForm" class="params">
+        <label>pairSum 上限 <input name="pair_sum_max" type="number" step="0.001" /></label>
+        <label>最低 ask <input name="min_ask" type="number" step="0.01" /></label>
+        <label>最高 ask <input name="max_ask" type="number" step="0.01" /></label>
+        <label>单侧 ask 上限 <input name="max_ask_skew" type="number" step="0.01" /></label>
+        <label>入场开始(s) <input name="entry_start_sec" type="number" step="1" /></label>
+        <label>入场结束(s) <input name="entry_end_sec" type="number" step="1" /></label>
+        <label>配对最少剩余(s) <input name="pair_entry_min_sec" type="number" step="1" /></label>
+        <label>孤儿宽限(s) <input name="orphan_grace_sec" type="number" step="1" /></label>
+        <label>单窗最多配对轮 <input name="max_pair_rounds_per_window" type="number" step="1" min="1" /></label>
+        <label>极端低价腿 ≤ <input name="pair_extreme_min" type="number" step="0.01" /></label>
+        <label>极端高价腿 ≥ <input name="pair_extreme_max" type="number" step="0.01" /></label>
+        <label>腿价比上限 <input name="pair_max_leg_ratio" type="number" step="0.1" min="1" /></label>
+        <label>单次份额 <input name="share_chunk" type="number" step="1" /></label>
+        <label>单笔上限$ <input name="max_trade_usdc" type="number" step="1" /></label>
+        <label>单市上限$ <input name="max_market_usdc" type="number" step="1" /></label>
+        <label>初始资金$ <input name="initial_capital_usdc" type="number" step="1" min="1" /></label>
+        <label>扫描间隔ms <input name="scan_interval_ms" type="number" step="100" min="500" /></label>
+        <label>滑点上限 <input name="slippage_limit" type="number" step="0.001" /></label>
+        <label>滑点容差¢ <input name="min_slippage_tolerance_cents" type="number" step="1" /></label>
+        <label>taker 费率 <input name="taker_fee_rate" type="number" step="0.001" /></label>
+        <label>maker 费率 <input name="maker_fee_rate" type="number" step="0.001" /></label>
+        <label>纸上真实撮合 <input name="paper_realistic" type="number" step="1" min="0" max="1" /></label>
+        <button type="submit" class="btn">保存参数</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="row-between">
+        <h2>日志</h2>
+        <button id="clearBtn" class="btn ghost danger">清除账本</button>
+      </div>
+      <ul id="logList" class="logs"></ul>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

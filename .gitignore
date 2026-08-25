@@ -1,0 +1,54 @@
+# ── Dependencies ───────────────────────────────────────────────────
+node_modules/
+
+# ── Secrets / local env (keep .env.example) ─────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+secrets/
+
+# ── Runtime state & trading ledgers ────────────────────────────────
+# Live/paper cash, positions, fills, settlements — never publish
+/data/**
+!/data/.gitkeep
+
+# ── Logs & process files ───────────────────────────────────────────
+logs/
+*.log
+*.pid
+nohup.out
+
+# ── Local backups / archives ───────────────────────────────────────
+.backup-path
+BACKUP_NOTE.txt
+*.bak
+*.bak-*
+*.tgz
+*.tar.gz
+*.zip
+deploy.tgz
+deploy.zip
+
+# ── OS / editor ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Cursor / agent local ───────────────────────────────────────────
+.cursor/
+.claude/
+
+# ── Coverage / misc build junk ─────────────────────────────────────
+coverage/
+.nyc_output/
+dist/
+build/
+*.tsbuildinfo
