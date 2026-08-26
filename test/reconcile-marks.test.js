@@ -36,7 +36,7 @@ console.log('reconcile-marks.test.js\n');
   const { latestSettlementByCondition } = require('../lib/reconcile');
   const map = latestSettlementByCondition([
     { conditionId: 'a', ts: '2026-01-01T00:00:00Z', upMark: 1, downMark: 0, realized: 0.2 },
-    { conditionId: 'a', ts: '2026-01-01T01:00:00Z', realized: 0.2 }, // newer, no marks
+    { conditionId: 'a', ts: '2026-01-01T01:00:00Z', realized: 0.2 },
   ]);
   const row = map.get('a');
   assert.strictEqual(row.upMark, 1, 'keep marks when newer row omits them');

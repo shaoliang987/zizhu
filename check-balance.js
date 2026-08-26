@@ -1,6 +1,6 @@
-require(" dotenv\).config();
-process.env.DRY_RUN=\false\;
-const { fetchAccountCashUsdc } = require(\./lib/account\);
+require('dotenv').config();
+process.env.DRY_RUN = 'false';
+const { fetchAccountCashUsdc } = require('./lib/account');
 (async () => {
  try {
  const bal = await fetchAccountCashUsdc({ force: true });

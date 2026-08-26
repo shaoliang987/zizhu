@@ -60,7 +60,26 @@ console.log('activity-merge.test.js\n');
     unwinding: false,
   });
   assert.ok(Math.abs(r.nextDown - 5) < 1e-9, 'new buys on Down raise shares');
-  console.log('  ok: new buys can raise missing leg');
+console.log('  ok: new buys can raise missing leg');
 }
 
-console.log('\n3 passed');
+{
+  const { activityTradeKey } = require('../lib/activity_backfill');
+  const base = {
+    transactionHash: '0xsame',
+    conditionId: 'cid',
+    outcome: 'Up',
+    timestamp: 1700000000,
+  };
+  const first = activityTradeKey({ ...base, size: 5, price: 0.45 }, 'LIVE_BUY');
+  const second = activityTradeKey({ ...base, size: 3, price: 0.46 }, 'LIVE_BUY');
+  assert.notStrictEqual(first, second, 'same tx can contain distinct fills');
+  assert.strictEqual(
+    first,
+    activityTradeKey({ ...base, size: 5, price: 0.45 }, 'LIVE_BUY'),
+    'same fill remains idempotent'
+  );
+  console.log('  ok: activity dedupe is fill-granular');
+}
+
+console.log('\n4 passed');
