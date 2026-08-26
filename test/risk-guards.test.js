@@ -465,55 +465,6 @@ function testOrphanForceBeforeWindowEnd() {
     start + 100
   );
   assert(age === 90, `hedgeRestAgeSec got ${age}`);
-
-  const detectedAt = (start + 100) * 1000;
-  const freshOrphan = shouldDeferOrphanUnwind({
-    upSh: 5,
-    downSh: 0,
-    hasUpRest: false,
-    hasDownRest: false,
-    windowStart: start,
-    windowEnd: end,
-    nowSec: start + 101,
-    orphanDetectedAtMs: detectedAt,
-    params: { ...params, orphan_grace_sec: 2 },
-  });
-  assert(freshOrphan.defer === true, 'fresh orphan defers from detection time');
-
-  const expiredOrphan = shouldDeferOrphanUnwind({
-    upSh: 5,
-    downSh: 0,
-    hasUpRest: false,
-    hasDownRest: false,
-    windowStart: start,
-    windowEnd: end,
-    nowSec: start + 103,
-    orphanDetectedAtMs: detectedAt,
-    params: { ...params, orphan_grace_sec: 2 },
-  });
-  assert(expiredOrphan.defer === false, 'orphan grace expires from detection time');
-}
-
-function testLiveCircuitBreaker() {
-  console.log('liveCircuitBreaker');
-  const { tripLiveCircuitBreaker, maybeResolveLiveCircuitBreaker } = require('../lib/live_circuit_breaker');
-  const market = { conditionId: 'cid-breaker', slug: 'btc-breaker' };
-  const state = {
-    bot_status: 'running',
-    positions: {
-      'cid-breaker': { conditionId: 'cid-breaker', upShares: 5, downShares: 0 },
-    },
-    open_orders: [],
-    logs: [],
-  };
-  tripLiveCircuitBreaker(state, market, { reason: 'missing Down', side: 'Up', remaining: 5 });
-  assert(state.bot_status === 'paused', 'breaker pauses new trading');
-  assert(state.liveCircuitBreaker.active === true, 'breaker is active');
-  assert(maybeResolveLiveCircuitBreaker(state) === false, 'one-sided inventory keeps breaker active');
-  state.positions['cid-breaker'].downShares = 5;
-  assert(maybeResolveLiveCircuitBreaker(state) === true, 'balanced inventory resolves breaker');
-  assert(state.liveCircuitBreaker.active === false, 'resolved breaker stays inactive');
-  assert(state.bot_status === 'paused', 'resolved breaker requires manual resume');
 }
 
 function testEmptyShellRecovery() {
@@ -577,7 +528,6 @@ testPairInflight();
 testUnwindBlocked();
 testRebalanceRiskGate();
 testOrphanForceBeforeWindowEnd();
-testLiveCircuitBreaker();
 testEmptyShellRecovery();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

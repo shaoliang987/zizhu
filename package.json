@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "mkdir -p logs && nohup node bot.js >> logs/bot.log 2>&1 & echo $! > logs/bot.pid",
-    "start:paper": "mkdir -p logs && nohup env STATE_DIR=./data/paper DRY_RUN=true LOCK_MODE=true INSTANCE_NAME=paper PORT=8087 STRATEGY_PARAMS_FILE=./strategy_params.json node bot.js >> logs/bot.log 2>&1 & echo $! > logs/bot.pid",
+    "start:paper": "mkdir -p logs && nohup env STATE_DIR=./data/paper DRY_RUN=true LOCK_MODE=true INSTANCE_NAME=paper PORT=8087 STRATEGY_PARAMS_FILE=./strategy_params.paper.json node bot.js >> logs/bot.log 2>&1 & echo $! > logs/bot.pid",
     "start:live": "mkdir -p logs && nohup env STATE_DIR=./data/live DRY_RUN=false LOCK_MODE=true INSTANCE_NAME=live PORT=8086 START_PAUSED=true STRATEGY_PARAMS_FILE=./strategy_params.json node bot.js >> logs/bot-live.log 2>&1 & echo $! > logs/bot-live.pid",
     "stop:paper": "if [ -f logs/bot.pid ]; then kill \"$(cat logs/bot.pid)\" 2>/dev/null || true; rm -f logs/bot.pid; fi",
     "stop:live": "if [ -f logs/bot-live.pid ]; then kill \"$(cat logs/bot-live.pid)\" 2>/dev/null || true; rm -f logs/bot-live.pid; fi",
