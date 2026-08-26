@@ -144,8 +144,10 @@ function testCompletePairCostOk() {
   console.log('completePairCostOk');
   const params = loadParams();
   const pos = { upShares: 5, downShares: 0, upCost: 3.5, downCost: 0 };
-  const ok = completePairCostOk(pos, 'Down', 0.28, params);
+  const ok = completePairCostOk(pos, 'Down', 0.26, params);
   assert(ok.ok === true, 'orphan up + cheap down ask ok');
+  const feeEdge = completePairCostOk(pos, 'Down', 0.28, params);
+  assert(feeEdge.ok === false, 'taker fee is included in strict pair cap');
   const bad = completePairCostOk(pos, 'Down', 0.5, params);
   assert(bad.ok === false, 'expensive down ask rejected');
 }

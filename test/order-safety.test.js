@@ -4,6 +4,8 @@ const {
   trackUncertainLiveBuy,
   tripLiveCircuitBreaker,
   maybeResolveLiveCircuitBreaker,
+  selectLiveEntryLegs,
+  orphanLossAtBid,
 } = require('../lib/live_clob');
 
 console.log('order-safety.test.js\n');
@@ -87,4 +89,26 @@ assert.strictEqual(state.bot_status, 'running');
   assert.strictEqual(maybeResolveLiveCircuitBreaker(lockedState), true);
 }
 
-console.log('8 passed');
+{
+  const legs = [
+    { side: 'Up', limit: 0.41 },
+    { side: 'Down', limit: 0.57 },
+  ];
+  const selected = selectLiveEntryLegs(legs, true, { live_high_leg_first: 1 });
+  assert.strictEqual(selected.length, 1);
+  assert.strictEqual(selected[0].side, 'Down', 'higher-priced leg is posted first');
+  assert.strictEqual(
+    selectLiveEntryLegs(legs, false, { live_high_leg_first: 1 }).length,
+    2,
+    'rebalance/non-pair orders are unchanged'
+  );
+}
+
+{
+  const pos = { upShares: 5, upCost: 3, downShares: 0, downCost: 0 };
+  const params = { max_orphan_loss_usdc: 0.35, taker_fee_rate: 0.07 };
+  assert.strictEqual(orphanLossAtBid(pos, 'Up', 0.57, params).exceeded, false);
+  assert.strictEqual(orphanLossAtBid(pos, 'Up', 0.54, params).exceeded, true);
+}
+
+console.log('12 passed');
