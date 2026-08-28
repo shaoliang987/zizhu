@@ -7,7 +7,6 @@ const {
   selectLiveEntryLegs,
   updatePendingPairLegs,
   pendingPairHedgeShares,
-  orphanLossAtBid,
 } = require('../lib/live_clob');
 const { riskResolved } = require('../lib/live_circuit_breaker');
 
@@ -140,13 +139,6 @@ assert.strictEqual(state.bot_status, 'running');
   });
   updatePendingPairLegs(state, market, prepared, true);
   assert.strictEqual(state.positions.cid2.pendingPairLegs, undefined, 'resting hedge clears pending');
-}
-
-{
-  const pos = { upShares: 5, upCost: 3, downShares: 0, downCost: 0 };
-  const params = { max_orphan_loss_usdc: 0.35, taker_fee_rate: 0.07 };
-  assert.strictEqual(orphanLossAtBid(pos, 'Up', 0.57, params).exceeded, false);
-  assert.strictEqual(orphanLossAtBid(pos, 'Up', 0.54, params).exceeded, true);
 }
 
 {

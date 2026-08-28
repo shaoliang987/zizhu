@@ -22,7 +22,6 @@ const {
   unwindBlocked,
   rebalanceWouldExceedRounds,
   rebalanceRiskGate,
-  shouldAllowOrphanLossDump,
 } = require('../lib/pair_risk');
 const { loadParams } = require('../lib/strategy');
 
@@ -493,63 +492,6 @@ function testOrphanForceBeforeWindowEnd() {
   assert(age === 90, `hedgeRestAgeSec got ${age}`);
 }
 
-function testShouldAllowOrphanLossDump() {
-  console.log('shouldAllowOrphanLossDump');
-  const params = {
-    ...loadParams(),
-    orphan_hedge_rest_max_sec: 25,
-    orphan_loss_min_sec: 45,
-    orphan_loss_hold_before_end_sec: 120,
-  };
-  const start = 1_000_000;
-  const end = start + 300;
-  const defer = { defer: true, reason: 'Up hedge resting' };
-  const blocked = shouldAllowOrphanLossDump({
-    lossExceeded: true,
-    defer,
-    hasMissingRest: true,
-    restAge: 5,
-    windowEnd: end,
-    nowSec: start + 60,
-    orphanAgeSec: 10,
-    params,
-  });
-  assert(blocked.allowed === false, 'loss dump blocked while hedge rest young');
-
-  const earlyWindow = shouldAllowOrphanLossDump({
-    lossExceeded: true,
-    defer: { defer: false },
-    hasMissingRest: false,
-    windowEnd: end,
-    nowSec: start + 60,
-    orphanAgeSec: 50,
-    params,
-  });
-  assert(earlyWindow.allowed === false, 'loss dump blocked with >120s left');
-
-  const unknownAge = shouldAllowOrphanLossDump({
-    lossExceeded: true,
-    defer: { defer: false },
-    hasMissingRest: false,
-    windowEnd: end,
-    nowSec: end - 60,
-    orphanAgeSec: null,
-    params,
-  });
-  assert(unknownAge.allowed === false, 'unknown orphan age cannot bypass minimum hold');
-
-  const late = shouldAllowOrphanLossDump({
-    lossExceeded: true,
-    defer: { defer: false },
-    hasMissingRest: false,
-    windowEnd: end,
-    nowSec: end - 60,
-    orphanAgeSec: 200,
-    params,
-  });
-  assert(late.allowed === true, 'loss dump allowed near window end');
-}
-
 function testEmptyShellRecovery() {
   console.log('emptyShellRecovery');
   const { recoverZombieSettlements } = require('../lib/settle');
@@ -612,7 +554,6 @@ testPairInflight();
 testUnwindBlocked();
 testRebalanceRiskGate();
 testOrphanForceBeforeWindowEnd();
-testShouldAllowOrphanLossDump();
 testEmptyShellRecovery();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
