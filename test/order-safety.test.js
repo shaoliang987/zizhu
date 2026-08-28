@@ -6,6 +6,7 @@ const {
   maybeResolveLiveCircuitBreaker,
   selectLiveEntryLegs,
   updatePendingPairLegs,
+  pendingPairHedgeShares,
   orphanLossAtBid,
 } = require('../lib/live_clob');
 const { riskResolved } = require('../lib/live_circuit_breaker');
@@ -62,6 +63,12 @@ assert.strictEqual(state.bot_status, 'running');
   assert.strictEqual(breakerState.liveCircuitBreaker.riskCount, 1, 'only resolved market is removed');
   breakerState.positions.a.downShares = 5;
   assert.strictEqual(maybeResolveLiveCircuitBreaker(breakerState), true, 'last risk can now resolve');
+}
+
+{
+  assert.strictEqual(pendingPairHedgeShares(2, 0), 2, 'partial first-leg fill hedges only 2 shares');
+  assert.strictEqual(pendingPairHedgeShares(5, 2), 3, 'existing opposite inventory reduces hedge size');
+  assert.strictEqual(pendingPairHedgeShares(5, 5), 0, 'balanced inventory needs no hedge');
 }
 
 {

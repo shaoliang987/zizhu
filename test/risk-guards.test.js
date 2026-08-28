@@ -156,14 +156,24 @@ function testCompletePairCostOk() {
 
 function testCanTakerHedgePairCost() {
   console.log('canTakerHedgePairCost');
-  const params = { pair_sum_max: 0.985, pair_hedge_fee_buffer: 0.015 };
+  const params = {
+    pair_sum_max: 0.985,
+    emergency_pair_sum_max: 0.992,
+    pair_hedge_fee_buffer: 0.015,
+    taker_fee_rate: 0.07,
+  };
   const pos = { upShares: 5, downShares: 0, upCost: 2.35, downCost: 0 };
-  const ok = canTakerHedgePairCost('Up', pos, 0.50, params);
-  assert(ok.ok === true, 'held avg + ask within max+buffer');
+  const ok = canTakerHedgePairCost('Up', pos, 0.49, params);
+  assert(ok.ok === true, 'held avg + ask + taker fee within strict max');
   const edge = canTakerHedgePairCost('Up', pos, 0.53, params);
-  assert(edge.ok === true, 'buffer allows slightly over raw max');
+  assert(edge.ok === false, 'configured buffer cannot expand strict pair max');
+  const emergencyPos = { upShares: 5, downShares: 0, upCost: 2.5, downCost: 0 };
+  const emergency = canTakerHedgePairCost('Up', emergencyPos, 0.47, params, 0.45);
+  assert(emergency.ok === true && emergency.mode === 'emergency', 'emergency hedge allowed when cheaper than unwind');
+  const costlyEmergency = canTakerHedgePairCost('Up', emergencyPos, 0.47, params, 0.55);
+  assert(costlyEmergency.ok === false, 'emergency hedge rejected when unwind is cheaper');
   const bad = canTakerHedgePairCost('Up', pos, 0.60, params);
-  assert(bad.ok === false, 'still rejects far over max+buffer');
+  assert(bad.ok === false, 'rejects far over strict max');
 }
 
 function testPairEntryBlocked() {
@@ -516,6 +526,17 @@ function testShouldAllowOrphanLossDump() {
     params,
   });
   assert(earlyWindow.allowed === false, 'loss dump blocked with >120s left');
+
+  const unknownAge = shouldAllowOrphanLossDump({
+    lossExceeded: true,
+    defer: { defer: false },
+    hasMissingRest: false,
+    windowEnd: end,
+    nowSec: end - 60,
+    orphanAgeSec: null,
+    params,
+  });
+  assert(unknownAge.allowed === false, 'unknown orphan age cannot bypass minimum hold');
 
   const late = shouldAllowOrphanLossDump({
     lossExceeded: true,
