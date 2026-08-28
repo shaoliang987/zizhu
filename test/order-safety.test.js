@@ -5,8 +5,10 @@ const {
   tripLiveCircuitBreaker,
   maybeResolveLiveCircuitBreaker,
   selectLiveEntryLegs,
+  updatePendingPairLegs,
   orphanLossAtBid,
 } = require('../lib/live_clob');
+const { riskResolved } = require('../lib/live_circuit_breaker');
 
 console.log('order-safety.test.js\n');
 
@@ -102,6 +104,35 @@ assert.strictEqual(state.bot_status, 'running');
     2,
     'rebalance/non-pair orders are unchanged'
   );
+  assert.strictEqual(
+    selectLiveEntryLegs(legs, true, { live_high_leg_first: 0 }).length,
+    2,
+    'live_high_leg_first off posts both legs'
+  );
+}
+
+{
+  const market = { conditionId: 'cid2', slug: 'btc-test-2' };
+  const state = {
+    positions: { cid2: { upShares: 5, downShares: 0, upCost: 2.35, downCost: 0 } },
+    open_orders: [],
+  };
+  const prepared = [
+    { side: 'Up', shares: 5, limit: 0.47, tokenId: 'up' },
+    { side: 'Down', shares: 5, limit: 0.51, tokenId: 'down' },
+  ];
+  updatePendingPairLegs(state, market, prepared, true);
+  assert.strictEqual(state.positions.cid2.pendingPairLegs.length, 1);
+  assert.strictEqual(state.positions.cid2.pendingPairLegs[0].side, 'Down');
+  state.open_orders.push({
+    status: 'open',
+    side: 'BUY',
+    outcome: 'Down',
+    conditionId: 'cid2',
+    live: true,
+  });
+  updatePendingPairLegs(state, market, prepared, true);
+  assert.strictEqual(state.positions.cid2.pendingPairLegs, undefined, 'resting hedge clears pending');
 }
 
 {
@@ -111,4 +142,24 @@ assert.strictEqual(state.bot_status, 'running');
   assert.strictEqual(orphanLossAtBid(pos, 'Up', 0.54, params).exceeded, true);
 }
 
-console.log('12 passed');
+{
+  const settled = {
+    conditionId: 'cid-settled',
+    settled: true,
+    upShares: 0,
+    downShares: 0,
+    riskLock: { reason: 'missing Up · unwind failed' },
+  };
+  const state = {
+    positions: { 'cid-settled': settled },
+    open_orders: [],
+  };
+  assert.strictEqual(
+    riskResolved(state, { conditionId: 'cid-settled' }),
+    true,
+    'settled flat window clears stale risk'
+  );
+  assert(!settled.riskLock, 'riskLock cleared on resolve check');
+}
+
+console.log('15 passed');

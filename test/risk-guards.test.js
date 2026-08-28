@@ -7,6 +7,7 @@ const {
   validatePairedPositionCost,
   detectPairExposure,
   completePairCostOk,
+  canTakerHedgePairCost,
   pairEntryBlocked,
   projectedPairCostOk,
   projectedPairCostOnLegFill,
@@ -21,6 +22,7 @@ const {
   unwindBlocked,
   rebalanceWouldExceedRounds,
   rebalanceRiskGate,
+  shouldAllowOrphanLossDump,
 } = require('../lib/pair_risk');
 const { loadParams } = require('../lib/strategy');
 
@@ -150,6 +152,18 @@ function testCompletePairCostOk() {
   assert(feeEdge.ok === false, 'taker fee is included in strict pair cap');
   const bad = completePairCostOk(pos, 'Down', 0.5, params);
   assert(bad.ok === false, 'expensive down ask rejected');
+}
+
+function testCanTakerHedgePairCost() {
+  console.log('canTakerHedgePairCost');
+  const params = { pair_sum_max: 0.985, pair_hedge_fee_buffer: 0.015 };
+  const pos = { upShares: 5, downShares: 0, upCost: 2.35, downCost: 0 };
+  const ok = canTakerHedgePairCost('Up', pos, 0.50, params);
+  assert(ok.ok === true, 'held avg + ask within max+buffer');
+  const edge = canTakerHedgePairCost('Up', pos, 0.53, params);
+  assert(edge.ok === true, 'buffer allows slightly over raw max');
+  const bad = canTakerHedgePairCost('Up', pos, 0.60, params);
+  assert(bad.ok === false, 'still rejects far over max+buffer');
 }
 
 function testPairEntryBlocked() {
@@ -469,6 +483,52 @@ function testOrphanForceBeforeWindowEnd() {
   assert(age === 90, `hedgeRestAgeSec got ${age}`);
 }
 
+function testShouldAllowOrphanLossDump() {
+  console.log('shouldAllowOrphanLossDump');
+  const params = {
+    ...loadParams(),
+    orphan_hedge_rest_max_sec: 25,
+    orphan_loss_min_sec: 45,
+    orphan_loss_hold_before_end_sec: 120,
+  };
+  const start = 1_000_000;
+  const end = start + 300;
+  const defer = { defer: true, reason: 'Up hedge resting' };
+  const blocked = shouldAllowOrphanLossDump({
+    lossExceeded: true,
+    defer,
+    hasMissingRest: true,
+    restAge: 5,
+    windowEnd: end,
+    nowSec: start + 60,
+    orphanAgeSec: 10,
+    params,
+  });
+  assert(blocked.allowed === false, 'loss dump blocked while hedge rest young');
+
+  const earlyWindow = shouldAllowOrphanLossDump({
+    lossExceeded: true,
+    defer: { defer: false },
+    hasMissingRest: false,
+    windowEnd: end,
+    nowSec: start + 60,
+    orphanAgeSec: 50,
+    params,
+  });
+  assert(earlyWindow.allowed === false, 'loss dump blocked with >120s left');
+
+  const late = shouldAllowOrphanLossDump({
+    lossExceeded: true,
+    defer: { defer: false },
+    hasMissingRest: false,
+    windowEnd: end,
+    nowSec: end - 60,
+    orphanAgeSec: 200,
+    params,
+  });
+  assert(late.allowed === true, 'loss dump allowed near window end');
+}
+
 function testEmptyShellRecovery() {
   console.log('emptyShellRecovery');
   const { recoverZombieSettlements } = require('../lib/settle');
@@ -519,6 +579,7 @@ testPairExposureDetection();
 testSettleInvariant();
 testBuildRiskSummary();
 testCompletePairCostOk();
+testCanTakerHedgePairCost();
 testPairEntryBlocked();
 testProjectedPairCost();
 testPairEntryRiskGateProjected();
@@ -530,6 +591,7 @@ testPairInflight();
 testUnwindBlocked();
 testRebalanceRiskGate();
 testOrphanForceBeforeWindowEnd();
+testShouldAllowOrphanLossDump();
 testEmptyShellRecovery();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
