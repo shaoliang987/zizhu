@@ -1,8 +1,8 @@
 {
   "quote_mode": "maker",
-  "pair_sum_max": 0.985,
-  "min_ask": 0.35,
-  "max_ask": 0.65,
+  "pair_sum_max": 0.99,
+  "min_ask": 0.30,
+  "max_ask": 0.70,
   "entry_start_sec": 30,
   "entry_end_sec": 240,
   "pair_entry_min_sec": 120,
@@ -12,7 +12,7 @@
   "orphan_hedge_rest_max_sec": 25,
   "pair_hedge_fee_buffer": 0,
   "emergency_pair_sum_max": 0.992,
-  "live_high_leg_first": 1,
+  "live_high_leg_first": 0,
   "share_chunk": 5,
   "max_trade_usdc": 5,
   "max_market_usdc": 10,
@@ -36,7 +36,7 @@
   "paper_bid_fill_fraction": 0.05,
   "paper_tape_fill_shares": 0,
   "max_pair_rounds_per_window": 1,
-  "pair_extreme_min": 0.35,
-  "pair_extreme_max": 0.65,
-  "pair_max_leg_ratio": 1.25
+  "pair_extreme_min": 0.30,
+  "pair_extreme_max": 0.70,
+  "pair_max_leg_ratio": 1.15
 }
