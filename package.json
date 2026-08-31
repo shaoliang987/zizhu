@@ -12,7 +12,7 @@
     "stop:live": "if [ -f logs/bot-live.pid ]; then kill \"$(cat logs/bot-live.pid)\" 2>/dev/null || true; rm -f logs/bot-live.pid; fi",
     "stop": "npm run stop:paper && npm run stop:live",
     "scan": "STATE_DIR=./data/paper DRY_RUN=true node -e \"require('./bot.js')\"",
-    "test": "node test/risk-guards.test.js && node test/skip-stats.test.js && node test/live-fill-sync.test.js && node test/hedge-cap.test.js && node test/dedupe-fills.test.js && node test/reconcile-marks.test.js && node test/activity-merge.test.js && node test/redeem-marks.test.js && node test/order-safety.test.js",
+    "test": "node test/risk-guards.test.js && node test/skip-stats.test.js && node test/live-fill-sync.test.js && node test/hedge-cap.test.js && node test/dedupe-fills.test.js && node test/reconcile-marks.test.js && node test/activity-merge.test.js && node test/redeem-marks.test.js && node test/order-safety.test.js && node test/user-ws.test.js",
     "stats:paper": "node scripts/paper-pair-stats.js ./data/paper",
     "stats:live": "node scripts/paper-pair-stats.js ./data/live",
     "backfill:activity": "STATE_DIR=./data/live DRY_RUN=false node scripts/backfill-activity.js",

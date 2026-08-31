@@ -50,9 +50,12 @@ const {
   cancelLiveStaleOrders,
   reconcileLiveOpenOrders,
   checkAllPairExposures,
+  applyLiveUserEvent,
 } = require('./lib/live_clob');
 const { retryPendingRedeems } = require('./lib/redeem');
 const { marketWs, setLogger: setMarketWsLogger } = require('./lib/market_ws');
+const { userWs } = require('./lib/user_ws');
+const { refreshAllInventoryStates } = require('./lib/inventory_state');
 const { withStateLock } = require('./lib/state_lock');
 const { buildRiskSummary } = require('./lib/risk_status');
 const { recordPlanOutcome, maybeFlushSkipSummary, resetSkipStats } = require('./lib/skip_stats');
@@ -123,6 +126,16 @@ async function runScanBody() {
     await checkAllPaperPairExposures(state);
     syncPaperLedgerPnl(state);
   } else if (isLive()) {
+    const userEvents = userWs.drain();
+    let wsApplied = 0;
+    for (const event of userEvents) {
+      const applied = await applyLiveUserEvent(state, event);
+      if (applied.applied) wsApplied += 1;
+    }
+    if (wsApplied) {
+      addLog(state, `[实盘用户WS] 已确认 ${wsApplied} 个订单事件`, 'success');
+      saveState(state);
+    }
     await reconcileLiveOpenOrders(state);
     await cancelLiveStaleOrders(state);
     await matchLiveOpenOrders(state);
@@ -137,8 +150,19 @@ async function runScanBody() {
 
   if (isLive()) {
     await checkAllPairExposures(state);
+    const inventoryChanges = refreshAllInventoryStates(state);
+    for (const change of inventoryChanges) {
+      addLog(
+        state,
+        `[实盘库存] ${change.conditionId} · ${change.previous || 'init'} → ${change.current}`,
+        'info'
+      );
+    }
     // A breaker recovery scan may bypass mode pause, but must never proceed to new entries.
     if (state.liveCircuitBreaker?.active || state.bot_status === 'paused' || isBotPaused()) {
+      // Keep authenticated fill/cancel coverage for carried positions even while
+      // market discovery and new entries are skipped.
+      userWs.syncMarkets(openPositions(state));
       saveState(state);
       return;
     }
@@ -164,6 +188,15 @@ async function runScanBody() {
     if (pos.downTokenId) tokenIds.push(pos.downTokenId);
   }
   marketWs.syncSubscriptions(tokenIds);
+  if (isLive()) {
+    const userMarkets = [...markets];
+    for (const pos of openPositions(state)) {
+      if (!userMarkets.some((m) => String(m.conditionId) === String(pos.conditionId))) {
+        userMarkets.push(pos);
+      }
+    }
+    userWs.syncMarkets(userMarkets);
+  }
 
   for (const market of markets) {
     const pos = state.positions[market.conditionId] || null;
@@ -217,7 +250,12 @@ async function runScanBody() {
 async function runScan() {
   if (scanInFlight) return;
   const riskRecoveryActive = isLive() && state.liveCircuitBreaker?.active;
-  if ((isBotPaused() && !riskRecoveryActive) || (state.bot_status === 'paused' && !riskRecoveryActive)) return;
+  const pausedWithoutRecovery =
+    (isBotPaused() && !riskRecoveryActive) ||
+    (state.bot_status === 'paused' && !riskRecoveryActive);
+  // Live pause blocks new entries inside runScanBody, but reconciliation, user
+  // WS draining and carried-position subscriptions must continue running.
+  if (pausedWithoutRecovery && !isLive()) return;
   scanInFlight = true;
   try {
     await withStateLock(async () => {
@@ -329,6 +367,7 @@ async function handleApi(req, res, pathname) {
       last_signal: lastSignal,
       markets: lastMarkets,
       clob_ws: marketWs.status(),
+      clob_user_ws: isLive() ? userWs.status() : null,
       open_positions: openPositions(state),
       open_orders: openOrders(state),
       marks,
@@ -652,6 +691,7 @@ async function main() {
     addLog(state, msg, level || 'info');
   });
   marketWs.start();
+  userWs.setLogger((msg, level) => addLog(state, msg, level || 'info'));
 
   addLog(
     state,
@@ -674,6 +714,8 @@ async function main() {
 
   if (isLive()) {
     try {
+      const { getClobApiCreds } = require('./lib/executor');
+      await userWs.start(getClobApiCreds);
       const rec = await reconcileLiveOpenOrders(state);
       addLog(
         state,
